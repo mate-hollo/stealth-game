@@ -5,14 +5,12 @@ using UnityEngine;
 public class Guard : MonoBehaviour {
 
 	public Transform pathHolder;
-	public float guardSpeed;
+	public float guardMoveSpeed;
 	public float guardWaitTime;
-
+	public float guardRotationSpeed;
+	
 	private float waypointMarkerSize = 0.3f;
 	Vector3[] waypoints;
-
-
-
 
 	void Start()
 	{
@@ -27,10 +25,8 @@ public class Guard : MonoBehaviour {
 			waypoints[i] = new Vector3(waypoints[i].x, transform.position.y, waypoints[i].z);
 		}
 
-
 		//guard path following coroutine
 		StartCoroutine(FollowPath(waypoints));
-
 
 	}
 
@@ -67,15 +63,20 @@ public class Guard : MonoBehaviour {
 		//set the guard's position to the first waypoint position
 		transform.position = waypoints[0];
 
+		
+
 		//keep track of the target waypoint index and set the next target
 		int targetWaypointIndex = 1;
 		Vector3 targetWaypoint = waypoints[targetWaypointIndex];
 
-        //keep moving the guard 
+		//make the guard face the target waypoint initially
+		transform.LookAt(targetWaypoint);
+
+		//keep moving the guard 
 		while (true)
 		{
 			//move the guard to the next waypoint
-			transform.position = Vector3.MoveTowards(transform.position, targetWaypoint, guardSpeed * Time.deltaTime);
+			transform.position = Vector3.MoveTowards(transform.position, targetWaypoint, guardMoveSpeed * Time.deltaTime);
 
 			//when we reach the targetted waypoint
 			if (transform.position == targetWaypoint)
@@ -85,11 +86,39 @@ public class Guard : MonoBehaviour {
 				targetWaypoint = waypoints[targetWaypointIndex];
 				//have the guard wait for waitTime seconds
 				yield return new WaitForSeconds(guardWaitTime);
+
+				//wait until the guard is rotating
+				yield return StartCoroutine(RotateGuard(targetWaypoint));
+
 			}
 			//yield for one frame between each iteration of the while loop
 			yield return null;
 		}
 	}
+
+	
+	IEnumerator RotateGuard(Vector3 target)
+	{
+		//calculate the normal vector between our current position and the position the guard will rotate towards
+		Vector3 directionToLookAt = (target - transform.position).normalized;
+
+		//angle to target: arc tangent(x/z) and convert it to degrees.
+		//substract this from 90 due to unity and trigonometric angle differences (or just switch x and z in atan2)
+		float targetAngle = 90 - Mathf.Atan2(directionToLookAt.z, directionToLookAt.x) * Mathf.Rad2Deg;
+
+		//check if our guards angle is different than the target angle (calc the difference, use a small value because it won't be 0)
+		while ( Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.y, targetAngle)) > 0.05f )
+		{
+			//calculate the guards current angle along y axis and add speed to it
+			float angle = Mathf.MoveTowardsAngle(transform.eulerAngles.y, targetAngle, guardRotationSpeed * Time.deltaTime);
+			//rotate the guard and wait for each frame
+			transform.eulerAngles = Vector3.up * angle;
+			yield return null;
+		}
+
+	}
+	
+	
 
 
 
