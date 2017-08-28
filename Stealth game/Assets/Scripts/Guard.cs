@@ -8,12 +8,27 @@ public class Guard : MonoBehaviour {
 	public float guardMoveSpeed;
 	public float guardWaitTime;
 	public float guardRotationSpeed;
-	
-	private float waypointMarkerSize = 0.3f;
+	public float guardViewDistance;
+	public Light spotLight;
+	public LayerMask viewMask;
+
+	float guardViewAngle;
+	float waypointMarkerSize = 0.3f;
 	Vector3[] waypoints;
+	Transform player;
+	Color originalSpotlightColor;
 
 	void Start()
 	{
+		//get a reference of the player using it's tag
+		player = GameObject.FindGameObjectWithTag("Player").transform;
+
+		//save the spotlights angle in a variable
+		guardViewAngle = spotLight.spotAngle;
+
+		//save the guard's original spotlight color
+		originalSpotlightColor = spotLight.color;
+
 		//create an array to store the waypoint positions - the size will be the number of childs in pathholder
 		waypoints = new Vector3[pathHolder.childCount];
 
@@ -30,10 +45,38 @@ public class Guard : MonoBehaviour {
 
 	}
 
-	void Update()
+	bool canSeePlayer()
 	{
-		
+		//first check: check if the player is within the guard's view distance
+		if (Vector3.Distance(transform.position, player.position) < guardViewDistance)
+		{
+			//get direction vector to the player
+			Vector3 directionToPlayer = (player.position - transform.position).normalized;
+			//get the angle between guard and player (max 180 degree)
+			float angleBetweenGuardAndPlayer = Vector3.Angle(transform.forward, directionToPlayer);
+
+			//second check: check if the angle between the guard's forward direction and the direction to the player is within the guard's viewangle
+			if (angleBetweenGuardAndPlayer < guardViewAngle / 2)
+			{
+				//third check: if the ray between guard and player have not hit anything
+				if (!Physics.Linecast(transform.position, player.position, viewMask))
+				{
+					return true;
+				}
+			}
+		}
+		return false;	
 	}
+
+	private void Update()
+	{
+		//if guard sees player change spotlight to red, else to it's original color
+		if (canSeePlayer())
+			spotLight.color = Color.red;
+		else
+			spotLight.color = originalSpotlightColor;
+	}
+
 
 	//add a sphere to waypoints so they are visible
 	private void OnDrawGizmos()
@@ -55,6 +98,10 @@ public class Guard : MonoBehaviour {
 
 		//after we looped through the pathholder, draw a line from the last waypoint to the starting position
 		Gizmos.DrawLine(waypointPreviousPosition, waypointStartPosition);
+
+		//draw a red line representing the guard's view distance
+		Gizmos.color = Color.red;
+		Gizmos.DrawRay(transform.position, transform.forward * guardViewDistance);
 	}
 	
 	//coroutine to move guard through it's path
@@ -62,8 +109,6 @@ public class Guard : MonoBehaviour {
 	{
 		//set the guard's position to the first waypoint position
 		transform.position = waypoints[0];
-
-		
 
 		//keep track of the target waypoint index and set the next target
 		int targetWaypointIndex = 1;
